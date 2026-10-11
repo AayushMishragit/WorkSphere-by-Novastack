@@ -15,6 +15,10 @@ app.get("/", (req, res) => res.send("Server is in Running State"));
 
 // Set up the "/api/inngest" (recommended) routes with the serve handler
 app.use("/api/inngest", serve({ client: inngest, functions }));
+app.use((err, req, res, next) => {
+  console.error("ERR:", err);
+  res.status(500).json({ error: err.message });
+});
 
 const PORT = process.env.PORT || 5000;
 
