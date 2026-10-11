@@ -43,7 +43,6 @@ const syncUserUpdation = inngest.createFunction(
   },
 );
 
-//clerk webhooks manager functions
 const syncWorkspaceCreation = inngest.createFunction(
   {
     id: "sync-workspace-from-clerk",
@@ -58,66 +57,50 @@ const syncWorkspaceCreation = inngest.createFunction(
         slug: data.slug,
         ownerId: data.created_by,
         image_url: data.image_url,
-      },
-    });
-
-    // add creater = ADMIN MEMBER
-    await prisma.workspaceMember.create({
-      data: {
-        user: data.created_by,
-        workspaceId: data.id,
-        role: "ADMIN",
+        members: { create: { userId: data.created_by, role: "ADMIN" } }, // creator = admin, one atomic call
       },
     });
   },
 );
 
-//function to update the workspace data
 const syncWorkspaceUpdation = inngest.createFunction(
-  { id: "update-workspace-from-clerk" },
-  { event: "clerk/organization.updated" },
+  {
+    id: "update-workspace-from-clerk",
+    triggers: { event: "clerk/organization.updated" },
+  },
   async ({ event }) => {
     const { data } = event;
     await prisma.workspace.update({
-      where: {
-        id: data.id,
-      },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        image_url: data.image_url,
-      },
+      where: { id: data.id },
+      data: { name: data.name, slug: data.slug, image_url: data.image_url },
     });
   },
 );
-//function to delete the workspace data
 
 const syncWorkspaceDeletion = inngest.createFunction(
-  { id: "delete-workspace-with-clerk" },
-  { event: "clerk/organization.deleted" },
+  {
+    id: "delete-workspace-with-clerk",
+    triggers: { event: "clerk/organization.deleted" },
+  },
   async ({ event }) => {
     const { data } = event;
-    await prisma.workspace.delete({
-      where: {
-        id: data.id,
-      },
-    });
+    await prisma.workspace.deleteMany({ where: { id: data.id } }); // doesn't throw if already gone
   },
 );
 
-//function o save workspace  member data to db
 const syncWorkspaceMemberCreation = inngest.createFunction(
   {
     id: "sync-workspace-member-from-clerk",
+    triggers: { event: "clerk/organizationInvitation.accepted" },
   },
-  { event: "clerk/organizationInvitation.accepted" },
   async ({ event }) => {
     const { data } = event;
+    const isAdmin = /admin/i.test(data.role_name ?? data.role ?? "");
     await prisma.workspaceMember.create({
       data: {
         userId: data.user_id,
-        workspaceId: data.organizatiom_id,
-        role: String(data.role_name).toLocaleUpperCase(),
+        workspaceId: data.organization_id,
+        role: isAdmin ? "ADMIN" : "MEMBER",
       },
     });
   },
