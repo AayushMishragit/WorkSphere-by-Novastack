@@ -5,7 +5,9 @@ import { clerkMiddleware } from "@clerk/express";
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
 import workspaceRouter from "./routes/workSpace.routes.js";
+import projectRouter from "./routes/project.routes.js";
 import { protect } from "../server/Middlewares/auth.middlewares.js";
+import taskRouter from "./routes/task.routes.js";
 
 const app = express();
 
@@ -18,9 +20,10 @@ app.get("/", (req, res) => res.send("Server is in Running State"));
 // Set up the "/api/inngest" (recommended) routes with the serve handler
 app.use("/api/inngest", serve({ client: inngest, functions }));
 //Routes
-console.log("protect hit");
+
 app.use("/apiworkspaces", protect, workspaceRouter);
-console.log("controller hit");
+app.use("/api/projects", protect, projectRouter);
+app.use("/api/tasks", protect, taskRouter);
 app.use((err, req, res, next) => {
   console.error("ERR:", err);
   res.status(500).json({ error: err.message });
