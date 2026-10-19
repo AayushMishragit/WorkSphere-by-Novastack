@@ -8,6 +8,7 @@ import workspaceRouter from "./routes/workSpace.routes.js";
 import projectRouter from "./routes/project.routes.js";
 import { protect } from "../server/Middlewares/auth.middlewares.js";
 import taskRouter from "./routes/task.routes.js";
+import commentrouter from "./routes/comment.routes.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/apiworkspaces", protect, workspaceRouter);
 app.use("/api/projects", protect, projectRouter);
 app.use("/api/tasks", protect, taskRouter);
+app.use("/api/comments", protect, commentrouter);
 app.use((err, req, res, next) => {
   console.error("ERR:", err);
   res.status(500).json({ error: err.message });
