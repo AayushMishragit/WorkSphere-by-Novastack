@@ -1,3 +1,4 @@
+import sendEmail from "../configs/nodemailer.js";
 import { prisma } from "../configs/prisma.js";
 import { Inngest } from "inngest";
 
@@ -105,6 +106,107 @@ const syncWorkspaceMemberCreation = inngest.createFunction(
     });
   },
 );
+
+//function for sending email on task creation
+const sendTaskAssignmentEmail = inngest.createFunction(
+  {
+    id: "send-task-assignment-email",
+  },
+  { event: "app/task.assigned" },
+  async ({ event, step }) => {
+    const { taskId, origin } = event.data;
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { assignee: true, project: true },
+    });
+
+    await sendEmail({
+      to: task.assignee.email,
+      subject: `New Task Assignment in  ${task.project.name}`,
+      body: `<div style="background-color:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border:1px solid #e5e7eb;border-top:4px solid #4f46e5;border-radius:12px;padding:32px;">
+
+    <h2 style="margin:0 0 20px;font-size:20px;line-height:1.3;color:#111827;">
+      Hello ${esc(task.assignee.name)}👋
+    </h2>
+    <b> <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;"> ${esc(task.title)}</p></b>
+         
+    <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
+      <p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:0.5px;text-transform:uppercase;color:#6b7280;">
+        Description
+      </p>
+      <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;">
+        ${esc(task.description)}
+      </p>
+    </div>
+
+    <p style="margin:0 0 28px;font-size:14px;color:#374151;">
+      ${new Date(task.due_date).toLocaleDateString()}
+    </p>
+
+    <a href="${origin}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;font-size:14px;font-weight:bold;text-decoration:none;padding:12px 24px;border-radius:8px;">
+      View Task
+    </a>
+
+  </div>
+</div>`,
+    });
+    if (
+      new Date(task.due_date).toLocaleDateString() != new Date().toDateString()
+    ) {
+      await step.sleepUntil("wait-for-the-due-date", new Date(task.due_date));
+
+      //if new date comes
+      await step.run("check-if-task-is-complted", async () => {
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+          include: { assignee: true, project: true },
+        });
+        if (!task) return;
+        if (task.status !== "DONE") {
+          await step.run("send-task-remainder-email", async () => {
+            await sendEmail({
+              to: task.assignee.email,
+              subject: `Remainder for ${task.project.name}`,
+              body: `Reminder: ${latest.title} is due`,
+              body: `
+<div style="background-color:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border:1px solid #e5e7eb;border-top:4px solid #f59e0b;border-radius:12px;padding:32px;">
+
+    <p style="margin:0 0 8px;font-size:12px;font-weight:bold;letter-spacing:0.5px;text-transform:uppercase;color:#d97706;">
+      Task Reminder
+    </p>
+
+    <h2 style="margin:0 0 20px;font-size:20px;line-height:1.3;color:#111827;">
+      Hello ${esc(latest.assignee.name)}: ${esc(latest.title)}
+    </h2>
+
+    <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
+      <p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:0.5px;text-transform:uppercase;color:#6b7280;">
+        Description
+      </p>
+      <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;">
+        ${esc(latest.description)}
+      </p>
+    </div>
+
+    <p style="margin:0 0 28px;font-size:14px;color:#374151;">
+      <strong>Due date:</strong> ${new Date(latest.due_date).toLocaleDateString()}
+    </p>
+
+    <a href="${origin}" style="display:inline-block;background-color:#f59e0b;color:#111827;font-size:14px;font-weight:bold;text-decoration:none;padding:12px 24px;border-radius:8px;">
+      View Task
+    </a>
+
+  </div>
+</div>`,
+            });
+          });
+        }
+      });
+    }
+  },
+);
 export const functions = [
   syncUserCreation,
   syncUserDeletion,
@@ -113,4 +215,5 @@ export const functions = [
   syncWorkspaceDeletion,
   syncWorkspaceUpdation,
   syncWorkspaceMemberCreation,
+  sendTaskAssignmentEmail,
 ];
