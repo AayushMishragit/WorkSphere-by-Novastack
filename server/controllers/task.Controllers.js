@@ -12,7 +12,7 @@ export const createTask = async (req, res) => {
       status,
       assigneeId,
       due_date,
-    } = await req.body();
+    } = req.body();
 
     const origin = req.get("origin");
     //check if user has the admin role  for the project

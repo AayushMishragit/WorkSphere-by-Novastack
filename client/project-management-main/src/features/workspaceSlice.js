@@ -7,7 +7,7 @@ export const fetchWorkspaces = createAsyncThunk(
   "workspace/fetchWorkspaces",
   async ({ getToken }) => {
     try {
-      const { data } = await api.get("apiworkspaces", {
+      const { data } = await api.get("/apiworkspaces", {
         headers: { Authorization: `Bearer ${await getToken()}` },
       });
       return data.workspaces || [];
@@ -57,7 +57,7 @@ const workspaceSlice = createSlice({
     },
     deleteWorkspace: (state, action) => {
       state.workspaces = state.workspaces.filter(
-        (w) => w._id !== action.payload,
+        (w) => w.id !== action.payload,
       );
     },
     addProject: (state, action) => {
