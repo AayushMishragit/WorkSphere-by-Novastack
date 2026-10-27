@@ -162,7 +162,7 @@ const workspaceSlice = createSlice({
           localStorage.getItem("currentWorkspaceId");
         if (localStorageCurrentWorkspaceId) {
           const findWorkspace = action.payload.find(
-            (w) => (w.id = localStorageCurrentWorkspaceId),
+            (w) => w.id === localStorageCurrentWorkspaceId,
           );
           if (findWorkspace) {
             state.currentWorkspace = findWorkspace;
