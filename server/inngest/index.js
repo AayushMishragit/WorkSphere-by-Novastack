@@ -5,6 +5,20 @@ import { Inngest } from "inngest";
 export const inngest = new Inngest({ id: "project-management" });
 
 const getName = (d) => `${d.first_name ?? ""} ${d.last_name ?? ""}`.trim();
+
+const esc = (s = "") =>
+  String(s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c],
+  );
+
 //function for creating user in database
 const syncUserCreation = inngest.createFunction(
   { id: "sync-user-from-clerk", triggers: { event: "clerk/user.created" } },
@@ -121,17 +135,20 @@ const sendTaskAssignmentEmail = inngest.createFunction(
       include: { assignee: true, project: true },
     });
 
-    await sendEmail({
-      to: task.assignee.email,
-      subject: `New Task Assignment in  ${task.project.name}`,
-      body: `<div style="background-color:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+    if (!task?.assignee) return;
+
+    await step.run("send-assignment-email", () =>
+      sendEmail({
+        to: task.assignee.email,
+        subject: `New Task Assignment in ${task.project.name}`,
+        body: `<div style="background-color:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
   <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border:1px solid #e5e7eb;border-top:4px solid #4f46e5;border-radius:12px;padding:32px;">
 
     <h2 style="margin:0 0 20px;font-size:20px;line-height:1.3;color:#111827;">
       Hello ${esc(task.assignee.name)}👋
     </h2>
     <b> <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;"> ${esc(task.title)}</p></b>
-         
+
     <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
       <p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:0.5px;text-transform:uppercase;color:#6b7280;">
         Description
@@ -151,26 +168,25 @@ const sendTaskAssignmentEmail = inngest.createFunction(
 
   </div>
 </div>`,
-    });
-    if (
-      new Date(task.due_date).toLocaleDateString() != new Date().toDateString()
-    ) {
+      }),
+    );
+
+    if (new Date(task.due_date).toDateString() !== new Date().toDateString()) {
       await step.sleepUntil("wait-for-the-due-date", new Date(task.due_date));
 
-      //if new date comes
-      await step.run("check-if-task-is-complted", async () => {
-        const task = await prisma.task.findUnique({
+      const latest = await step.run("check-if-task-is-completed", () =>
+        prisma.task.findUnique({
           where: { id: taskId },
           include: { assignee: true, project: true },
-        });
-        if (!task) return;
-        if (task.status !== "DONE") {
-          await step.run("send-task-remainder-email", async () => {
-            await sendEmail({
-              to: task.assignee.email,
-              subject: `Remainder for ${task.project.name}`,
-              body: `Reminder: ${latest.title} is due`,
-              body: `
+        }),
+      );
+
+      if (latest && latest.status !== "DONE") {
+        await step.run("send-task-reminder-email", () =>
+          sendEmail({
+            to: latest.assignee.email,
+            subject: `Reminder for ${latest.project.name}`,
+            body: `
 <div style="background-color:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
   <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border:1px solid #e5e7eb;border-top:4px solid #f59e0b;border-radius:12px;padding:32px;">
 
@@ -201,13 +217,13 @@ const sendTaskAssignmentEmail = inngest.createFunction(
 
   </div>
 </div>`,
-            });
-          });
-        }
-      });
+          }),
+        );
+      }
     }
   },
 );
+
 export const functions = [
   syncUserCreation,
   syncUserDeletion,

@@ -16,7 +16,7 @@ export const createTask = async (req, res) => {
     } = req.body;
 
     const origin = req.get("origin");
-    //check if user has the admin role  for the project
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: { members: { include: { user: true } } },
@@ -27,7 +27,7 @@ export const createTask = async (req, res) => {
     } else if (project.team_lead !== userId) {
       return res
         .status(403)
-        .json({ messgae: "You have no the permission for this project" });
+        .json({ message: "You don't have permission for this project" });
     } else if (
       assigneeId &&
       !project.members.find((member) => member.user.id === assigneeId)
@@ -42,25 +42,29 @@ export const createTask = async (req, res) => {
         projectId,
         title,
         description,
+        type,
         priority,
         assigneeId,
         status,
         due_date: new Date(due_date),
       },
     });
+
     const taskWithAssignee = await prisma.task.findUnique({
       where: { id: task.id },
       include: { assignee: true },
     });
 
-    //sending email
-    await inngest.send({
-      name: "app/task.assigned",
-      data: {
-        taskId: task.id,
-        origin,
-      },
-    });
+    // email/queue failure must not fail task creation
+    try {
+      await inngest.send({
+        name: "app/task.assigned",
+        data: { taskId: task.id, origin },
+      });
+    } catch (err) {
+      console.log("inngest send failed:", err.message);
+    }
+
     res.json({ task: taskWithAssignee, message: "Task created successfully" });
   } catch (error) {
     console.log(error);
