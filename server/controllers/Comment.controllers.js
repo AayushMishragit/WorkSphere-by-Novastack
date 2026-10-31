@@ -4,7 +4,7 @@ import prisma from "../configs/prisma.js";
 export const addComment = async (req, res) => {
   try {
     const { userId } = await req.auth();
-    const { content, taskId } = req.body();
+    const { content, taskId } = req.body;
 
     //check if user is project member
     const task = await prisma.task.findUnique({
@@ -31,7 +31,7 @@ export const addComment = async (req, res) => {
       data: { taskId, content, userId },
       include: { user: true },
     });
-    res.json({ content });
+    res.json({ comment });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: error.code || error.message });

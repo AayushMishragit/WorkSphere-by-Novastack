@@ -7,6 +7,6 @@ import {
 const commentrouter = express.Router();
 
 commentrouter.post("/", addComment);
-commentrouter.post("/:taskId", getTaskComments);
+commentrouter.get("/:taskId", getTaskComments);
 
 export default commentrouter;

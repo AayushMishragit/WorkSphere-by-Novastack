@@ -121,7 +121,7 @@ export const updateTask = async (req, res) => {
 export const deleteTask = async (req, res) => {
   try {
     const { userId } = await req.auth();
-    const { taskIds } = req.body();
+    const { taskIds } = req.body;
     const tasks = await prisma.task.findMany({
       where: { id: { in: taskIds } },
     });
@@ -130,7 +130,7 @@ export const deleteTask = async (req, res) => {
     }
 
     const project = await prisma.project.findUnique({
-      where: { id: task[0].projectId },
+      where: { id: tasks[0].projectId },
       include: { members: { include: { user: true } } },
     });
 
